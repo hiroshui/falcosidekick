@@ -16,6 +16,8 @@ func NewSyslogClient(config *types.Configuration, stats *types.Statistics, promS
 		return nil, fmt.Errorf("failed to configure Syslog client: invalid protocol %s", config.Syslog.Protocol)
 	}
 
+	log.Printf("[MKRONE]: Initialized syslog client ..")
+
 	return &Client{
 		OutputType:      "Syslog",
 		Config:          config,
@@ -31,6 +33,7 @@ func isValidProtocolString(protocol string) bool {
 }
 
 func (c *Client) SyslogPost(falcopayload types.FalcoPayload) {
+	log.Printf("[MKRONE]: Post falcopayload to syslog..")
 	c.Stats.Syslog.Add(Total, 1)
 	endpoint := fmt.Sprintf("%s:%s", c.Config.Syslog.Host, c.Config.Syslog.Port)
 
@@ -54,6 +57,7 @@ func (c *Client) SyslogPost(falcopayload types.FalcoPayload) {
 		priority = syslog.LOG_DEBUG
 	}
 
+	log.Printf("[MKRONE]: Establish a connection to syslog server %e, prop %p", endpoint, priority)
 	sysLog, err := syslog.Dial(c.Config.Syslog.Protocol, endpoint, priority, Falco)
 	if err != nil {
 		go c.CountMetric(Outputs, 1, []string{"output:syslog", "status:error"})
@@ -61,8 +65,11 @@ func (c *Client) SyslogPost(falcopayload types.FalcoPayload) {
 		c.PromStats.Outputs.With(map[string]string{"destination": "syslog", "status": Error}).Inc()
 		log.Printf("[ERROR] : Syslog - %v\n", err)
 		return
+	} else {
+		log.Printf("[MKRONE]: err is nil")
 	}
 
+	log.Printf("[MKRONE]: Using connection for write to syslog server")
 	b, _ := json.Marshal(falcopayload)
 	_, err = sysLog.Write(b)
 	if err != nil {
@@ -71,8 +78,11 @@ func (c *Client) SyslogPost(falcopayload types.FalcoPayload) {
 		c.PromStats.Outputs.With(map[string]string{"destination": "syslog", "status": Error}).Inc()
 		log.Printf("[ERROR] : Syslog - %v\n", err)
 		return
+	} else {
+		log.Printf("[MKRONE]: err is nil")
 	}
 
+	log.Printf("[MKRONE]: status should be ok")
 	go c.CountMetric(Outputs, 1, []string{"output:syslog", "status:ok"})
 	c.Stats.Syslog.Add(OK, 1)
 	c.PromStats.Outputs.With(map[string]string{"destination": "syslog", "status": OK}).Inc()
